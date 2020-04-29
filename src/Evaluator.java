@@ -35,7 +35,9 @@ public class Evaluator {
     /**
      * The file that contains the task and request definitions.
      */
-    private static final String tasksAndRequestsFile = queriesFilesDirectory + "dry-run-topics.auto.json";
+    private static final String runType = "auto";
+    private static final String tasksAndRequestsFile = queriesFilesDirectory + "dry-run-topics."
+        + runType + ".json";
 
     /**
      * The tasks in the tasksAndRequestsFile converted into a Map of Task objects.
@@ -148,7 +150,8 @@ public class Evaluator {
      * @return A Solution object that captures the query results.
      */
     private Solution readQueryResultsFile(String solution)  {
-        String fileName = resultsFilesDirectory + "dry-run-topics.auto." + solution + ".out";
+        String fileName = resultsFilesDirectory + "dry-run-topics." + runType
+                 + "." + solution + ".out";
         List<RequestRun> requestRuns = new ArrayList<>();
         List<String> docids = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
@@ -224,13 +227,17 @@ public class Evaluator {
                 Request r = findRequest(t, requestID);
                 for (String s : t.taskDocList) {
                     ++totalTaskDocids;
-                    if (s1DocidsList.contains(s)) {
+                    if (!s1DocidsList.contains(s)) {
+                        System.out.println("Task hint doc " + s + " not found in results for " + requestID);
+                    } else {
                         ++taskMatchCount;
                     }
                 }
                 for (String s : r.reqDocList) {
                     ++totalRequestDocids;
-                    if (s1DocidsList.contains(s)) {
+                    if (!s1DocidsList.contains(s)) {
+                        System.out.println("Request hint doc " + s + " not found in results for " + requestID);
+                    } else {
                         ++requestMatchCount;
                     }
                 }
