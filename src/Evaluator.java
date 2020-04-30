@@ -20,8 +20,7 @@ public class Evaluator {
      */
     private final List<String> solutionNames = new ArrayList<String>(Arrays.asList(
             "CLEAR-BASE-TEST",
-            "CLEAR-1-TEST"
-            /*,
+            "CLEAR-1-TEST",
             "CLEAR-2-TEST",
             "CLEAR-3-TEST",
             "CLEAR-4-TEST",
@@ -30,7 +29,7 @@ public class Evaluator {
             "BBN-1",
             "JHU-1",
             "BROWN-1"
-            */));
+            ));
 
     /**
      * The file that contains the task and request definitions.
@@ -196,8 +195,7 @@ public class Evaluator {
 
         List<String> solutions = new ArrayList<String>(Arrays.asList(
                 "CLEAR-BASE-TEST",
-                "CLEAR-1-TEST"
-                /*,
+                "CLEAR-1-TEST",
                 "CLEAR-2-TEST",
                 "CLEAR-3-TEST",
                 "CLEAR-4-TEST",
@@ -206,7 +204,7 @@ public class Evaluator {
                 "BBN-1",
                 "JHU-1",
                 "BROWN-1"
-                */));
+                ));
 
 
         for (String solutionName : solutions) {
@@ -228,7 +226,7 @@ public class Evaluator {
                 for (String s : t.taskDocList) {
                     ++totalTaskDocids;
                     if (!s1DocidsList.contains(s)) {
-                        System.out.println("Task hint doc " + s + " not found in results for " + requestID);
+     //                   System.out.println("Task hint doc " + s + " not found in results for " + requestID);
                     } else {
                         ++taskMatchCount;
                     }
@@ -236,7 +234,7 @@ public class Evaluator {
                 for (String s : r.reqDocList) {
                     ++totalRequestDocids;
                     if (!s1DocidsList.contains(s)) {
-                        System.out.println("Request hint doc " + s + " not found in results for " + requestID);
+    //                    System.out.println("Request hint doc " + s + " not found in results for " + requestID);
                     } else {
                         ++requestMatchCount;
                     }
@@ -244,6 +242,9 @@ public class Evaluator {
             }
             System.out.println((taskMatchCount + requestMatchCount)
                                 + " out of " + (totalRequestDocids + totalTaskDocids));
+            System.out.printf("%.0f%%\n",
+                    ((taskMatchCount + requestMatchCount) * 1.0 /
+                    (totalRequestDocids + totalTaskDocids) * 100));
         }
     }
 
