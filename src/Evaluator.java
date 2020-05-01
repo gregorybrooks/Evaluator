@@ -5,10 +5,12 @@ import org.json.simple.parser.ParseException;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  */
 public class Evaluator {
+    private static final int MAX_DOCIDS = 1000;  // number of hits to look at
     /**
      * The list of solutions (these are files that were output by Galago's batch-search.)
      */
@@ -171,8 +173,10 @@ public class Evaluator {
                     }
                 }
                 prevQueryID = queryID;
-                docids.add(line.split("[ \t]+")[2]); // doc ID is 3rd field
-                ++docidsAdded;
+                if (docidsAdded < MAX_DOCIDS) {
+                    docids.add(line.split("[ \t]+")[2]); // doc ID is 3rd field
+                    ++docidsAdded;
+                }
             }
             if (!prevQueryID.equalsIgnoreCase("")) {
                 // Clone the list
@@ -187,25 +191,56 @@ public class Evaluator {
         return new Solution(solution, requestRuns);
     }
 
+    private void fixTaskDocs() {
+        tasks.forEach((k,v)->{
+            String taskName = k;
+            Task t = v;
+//            System.out.println("Task " + taskName);
+            t.requests.forEach((rk,rv)->{
+                String requestName = rk;
+                Request r = rv;
+//                System.out.println("Request " + requestName);
+                r.reqDocList.forEach((d)->{
+                    if (!t.taskDocList.contains(d)) {
+/*
+                        System.out.println("Found a request doc not in task docs");
+                        System.out.println("Task docs:");
+                        System.out.println(t.taskDocList);
+                        System.out.println("Request docs:");
+                        System.out.println(r.reqDocList);
+*/
+                        t.taskDocList.add(d);
+                    }
+                });
+            });
+        });
+    }
+
     /**
      */
     private void process() throws IOException, InterruptedException, ParseException {
         loadTasks();
+        fixTaskDocs();  //Make sure task-docs contains all req-docs
         loadSolutionResults();
 
-        List<String> solutions = new ArrayList<String>(Arrays.asList(
-                "CLEAR-BASE-TEST",
-                "CLEAR-1-TEST",
-                "CLEAR-2-TEST",
-                "CLEAR-3-TEST",
-                "CLEAR-4-TEST",
-                "CLEAR-5-TEST",
-                "CLEAR-6-TEST",
-                "BBN-1",
-                "JHU-1",
-                "BROWN-1"
-                ));
+//        List<String> solutions = new ArrayList<String>(Arrays.asList(
+//                "CLEAR-BASE-TEST",
+//                "CLEAR-1-TEST",
+//                "CLEAR-2-TEST",
+//                "CLEAR-3-TEST",
+//                "CLEAR-4-TEST",
+//                "CLEAR-5-TEST",
+//                "CLEAR-6-TEST",
+//                "BBN-1",
+//                "JHU-1",
+//                "BROWN-1"
+//                ));
 
+        List<String> solutions = new ArrayList<String>(Arrays.asList(
+                  "CLEAR-2-TEST"
+        ));
+
+        System.out.println("Looking at the top " + MAX_DOCIDS + " hits for each query");
 
         for (String solutionName : solutions) {
             Solution s1 = solutionResults.get(solutionName);
@@ -223,6 +258,8 @@ public class Evaluator {
                 String requestID = s1RequestRun.getQueryID();
                 Task t = findTask(requestID.substring(0, 5));
                 Request r = findRequest(t, requestID);
+//                System.out.println("Task docs: " + t.taskDocList.size());
+//                System.out.println("Request docs: " + r.reqDocList.size());
                 for (String s : t.taskDocList) {
                     ++totalTaskDocids;
                     if (!s1DocidsList.contains(s)) {
@@ -234,17 +271,20 @@ public class Evaluator {
                 for (String s : r.reqDocList) {
                     ++totalRequestDocids;
                     if (!s1DocidsList.contains(s)) {
-    //                    System.out.println("Request hint doc " + s + " not found in results for " + requestID);
+  //                      System.out.println("Request hint doc " + s + " not found in results for " + requestID);
                     } else {
                         ++requestMatchCount;
                     }
                 }
             }
             System.out.println((taskMatchCount + requestMatchCount)
-                                + " out of " + (totalRequestDocids + totalTaskDocids));
+                               + " out of " + (totalRequestDocids + totalTaskDocids));
             System.out.printf("%.0f%%\n",
                     ((taskMatchCount + requestMatchCount) * 1.0 /
                     (totalRequestDocids + totalTaskDocids) * 100));
+//            System.out.printf("%.0f%%\n",
+//                    ((requestMatchCount) * 1.0 /
+//                            (totalRequestDocids ) * 100));
         }
     }
 
