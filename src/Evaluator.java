@@ -260,28 +260,57 @@ public class Evaluator {
                 Request r = findRequest(t, requestID);
 //                System.out.println("Task docs: " + t.taskDocList.size());
 //                System.out.println("Request docs: " + r.reqDocList.size());
+                int taskDocsFound = 0;
+                int requestDocsFound = 0;
                 for (String s : t.taskDocList) {
-                    ++totalTaskDocids;
-                    if (!s1DocidsList.contains(s)) {
-     //                   System.out.println("Task hint doc " + s + " not found in results for " + requestID);
-                    } else {
-                        ++taskMatchCount;
+                    if (s1DocidsList.contains(s)) {
+                        ++taskDocsFound;
                     }
                 }
                 for (String s : r.reqDocList) {
-                    ++totalRequestDocids;
-                    if (!s1DocidsList.contains(s)) {
-  //                      System.out.println("Request hint doc " + s + " not found in results for " + requestID);
-                    } else {
-                        ++requestMatchCount;
+                    if (s1DocidsList.contains(s)) {
+                        ++requestDocsFound;
                     }
                 }
+                /* E1 is request level, E2 is task level */
+                double e1Recall = ((double)requestDocsFound / r.reqDocList.size()) * 100;
+                double e2Recall = ((double)taskDocsFound / t.taskDocList.size()) * 100;
+                double e1Precision = ((double)requestDocsFound / s1DocidsList.size()) * 100;
+                double e2Precision = ((double)taskDocsFound / s1DocidsList.size()) * 100;
+
+                String[] s1Docids = new String[s1DocidsList.size()];
+                s1Docids = s1DocidsList.toArray(s1Docids);
+
+                int score = 0;
+                for (int x = 0; x < r.reqDocList.size(); ++x) {
+                    if (r.reqDocList.contains(s1Docids[x])) {
+                        score += 1;
+                    }
+                }
+                double e1RPrecision = ((double)score / r.reqDocList.size()) * 100;
+
+                score = 0;
+                for (int x = 0; x < t.taskDocList.size(); ++x) {
+                    if (t.taskDocList.contains(s1Docids[x])) {
+                        score += 1;
+                    }
+                }
+                double e2RPrecision = ((double)score / t.taskDocList.size()) * 100;
+                System.out.println("Request " + requestID);
+                System.out.println("  Evaluation Type 1");
+                System.out.println("    Recall: " + e1Recall);
+                System.out.println("    Precision: " + e1Precision);
+                System.out.println("    RPrecision: " + e1RPrecision);
+                System.out.println("  Evaluation Type 2");
+                System.out.println("    Recall: " + e2Recall);
+                System.out.println("    Precision: " + e2Precision);
+                System.out.println("    RPrecision: " + e2RPrecision);
             }
-            System.out.println((taskMatchCount + requestMatchCount)
-                               + " out of " + (totalRequestDocids + totalTaskDocids));
-            System.out.printf("%.0f%%\n",
-                    ((taskMatchCount + requestMatchCount) * 1.0 /
-                    (totalRequestDocids + totalTaskDocids) * 100));
+//            System.out.println((taskMatchCount + requestMatchCount)
+//                               + " out of " + (totalRequestDocids + totalTaskDocids));
+//            System.out.printf("%.0f%%\n",
+//            ((taskMatchCount + requestMatchCount) * 1.0 /
+//                    (totalRequestDocids + totalTaskDocids) * 100));
 //            System.out.printf("%.0f%%\n",
 //                    ((requestMatchCount) * 1.0 /
 //                            (totalRequestDocids ) * 100));
