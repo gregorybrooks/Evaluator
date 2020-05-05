@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  */
 public class Evaluator {
-    private static final int MAX_DOCIDS = 10;  // number of hits to look at
     /**
      * The list of solutions (these are files that were output by Galago's batch-search.)
      */
@@ -49,6 +48,8 @@ public class Evaluator {
      * The solution results after being converted to Solution objects.
      */
     private final Map<String,Solution> solutionResults = new HashMap<>();
+
+    private Integer resultSetSize = -1;  // number of hits to look at
 
     /**
      * Within the solution are multiple Tasks, and each Task has multiple Requests.
@@ -173,7 +174,7 @@ public class Evaluator {
                     }
                 }
                 prevQueryID = queryID;
-                if (docidsAdded < MAX_DOCIDS) {
+                if (docidsAdded < resultSetSize) {
                     docids.add(line.split("[ \t]+")[2]); // doc ID is 3rd field
                     ++docidsAdded;
                 }
@@ -221,7 +222,6 @@ public class Evaluator {
     private void process() throws IOException, InterruptedException, ParseException {
         loadTasks();
         fixTaskDocs();  //Make sure task-docs contains all req-docs
-        loadSolutionResults();
 
         List<String> solutions = new ArrayList<String>(Arrays.asList(
                 "CLEAR-BASE-TEST",
@@ -235,8 +235,9 @@ public class Evaluator {
                 "JHU-1",
                 "BROWN-1"
                 ));
-
-        System.out.println("Looking at the top " + MAX_DOCIDS + " hits for each query");
+        List<Integer> resultSetSizes = new ArrayList<Integer>(Arrays.asList(
+                10, 20, 50, 100, 250, 500, 1000
+        ));
 
         FileWriter csvWriter = new FileWriter("/home/glbrooks/comparison.csv");
         csvWriter.append("Solution");
@@ -245,86 +246,90 @@ public class Evaluator {
         csvWriter.append(",");
         csvWriter.append("Result Set Size");
         csvWriter.append(",");
+        /*
         csvWriter.append("Averaging Type");
         csvWriter.append(",");
-        csvWriter.append("Avg Recall (Pct)");
+        */
+        csvWriter.append("Recall (Pct)");
         csvWriter.append(",");
-        csvWriter.append("Avg Precision (Pct)");
+        csvWriter.append("Precision (Pct)");
         csvWriter.append(",");
-        csvWriter.append("Avg R Precision (Pct)");
+        csvWriter.append("R Precision (Pct)");
         csvWriter.append("\n");
+        for (Integer rsize : resultSetSizes) {
+            resultSetSize = rsize;
+            loadSolutionResults();
+            for (String solutionName : solutions) {
+                Solution s1 = solutionResults.get(solutionName);
+                System.out.println("Evaluating solution " + s1.getName());
+                List<RequestRun> s1RequestRuns = s1.getRequestRuns();
+                ListIterator<RequestRun> s1RequestsIterator = s1RequestRuns.listIterator();
+                double totalE1Recall = 0.0;
+                double totalE2Recall = 0.0;
+                double totalE1Precision = 0.0;
+                double totalE2Precision = 0.0;
+                double totalE1RPrecision = 0.0;
+                double totalE2RPrecision = 0.0;
 
-        for (String solutionName : solutions) {
-            Solution s1 = solutionResults.get(solutionName);
-            System.out.println("Evaluating solution " + s1.getName());
-            List<RequestRun> s1RequestRuns = s1.getRequestRuns();
-            ListIterator<RequestRun> s1RequestsIterator = s1RequestRuns.listIterator();
-            double totalE1Recall = 0.0;
-            double totalE2Recall = 0.0;
-            double totalE1Precision = 0.0;
-            double totalE2Precision = 0.0;
-            double totalE1RPrecision = 0.0;
-            double totalE2RPrecision = 0.0;
+                double totalTaskE1Recall = 0.0;
+                double totalTaskE1Precision = 0.0;
+                double totalTaskE1RPrecision = 0.0;
+                double totalTaskE2Recall = 0.0;
+                double totalTaskE2Precision = 0.0;
+                double totalTaskE2RPrecision = 0.0;
 
-            double totalTaskE1Recall = 0.0;
-            double totalTaskE1Precision = 0.0;
-            double totalTaskE1RPrecision = 0.0;
-            double totalTaskE2Recall = 0.0;
-            double totalTaskE2Precision = 0.0;
-            double totalTaskE2RPrecision = 0.0;
+                int numRequests = s1RequestRuns.size();
+                int totalTasks = 0;
+                String prevTaskID = "EMPTY";
+                String taskID = "";
+                int totalRequestsInTask = 0;
 
-            int numRequests = s1RequestRuns.size();
-            int totalTasks = 0;
-            String prevTaskID = "EMPTY";
-            String taskID = "";
-            int totalRequestsInTask = 0;
+                double taskE1Recall = 0.0;
+                double taskE1Precision = 0.0;
+                double taskE1RPrecision = 0.0;
+                double taskE2Recall = 0.0;
+                double taskE2Precision = 0.0;
+                double taskE2RPrecision = 0.0;
 
-            double taskE1Recall = 0.0;
-            double taskE1Precision = 0.0;
-            double taskE1RPrecision = 0.0;
-            double taskE2Recall = 0.0;
-            double taskE2Precision = 0.0;
-            double taskE2RPrecision = 0.0;
-
-            while (s1RequestsIterator.hasNext()) {
-                RequestRun s1RequestRun = s1RequestsIterator.next();
-                List<String> s1DocidsList = s1RequestRun.getDocids();
-                String requestID = s1RequestRun.getQueryID();
-                taskID = requestID.substring(0, 5);
-                if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
-                    ++totalTasks;
-                    totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
-                    totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
-                    totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
-                    totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
-                    totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
-                    totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
-                    taskE1Recall = 0.0;
-                    taskE1Precision = 0.0;
-                    taskE1RPrecision = 0.0;
-                    taskE2Recall = 0.0;
-                    taskE2Precision = 0.0;
-                    taskE2RPrecision = 0.0;
-                    totalRequestsInTask = 0;
-                }
-                prevTaskID = taskID;
-                ++totalRequestsInTask;
-                Task t = findTask(taskID);
-                Request r = findRequest(t, requestID);
+                while (s1RequestsIterator.hasNext()) {
+                    RequestRun s1RequestRun = s1RequestsIterator.next();
+                    List<String> s1DocidsList = s1RequestRun.getDocids();
+                    String requestID = s1RequestRun.getQueryID();
+                    taskID = requestID.substring(0, 5);
+                    if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
+                        ++totalTasks;
+                        totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
+                        totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
+                        totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
+                        totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
+                        totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
+                        totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
+                        taskE1Recall = 0.0;
+                        taskE1Precision = 0.0;
+                        taskE1RPrecision = 0.0;
+                        taskE2Recall = 0.0;
+                        taskE2Precision = 0.0;
+                        taskE2RPrecision = 0.0;
+                        totalRequestsInTask = 0;
+                    }
+                    prevTaskID = taskID;
+                    ++totalRequestsInTask;
+                    Task t = findTask(taskID);
+                    Request r = findRequest(t, requestID);
 //                System.out.println("Task docs: " + t.taskDocList.size());
 //                System.out.println("Request docs: " + r.reqDocList.size());
-                int taskDocsFound = 0;
-                int requestDocsFound = 0;
-                for (String s : t.taskDocList) {
-                    if (s1DocidsList.contains(s)) {
-                        ++taskDocsFound;
+                    int taskDocsFound = 0;
+                    int requestDocsFound = 0;
+                    for (String s : t.taskDocList) {
+                        if (s1DocidsList.contains(s)) {
+                            ++taskDocsFound;
+                        }
                     }
-                }
-                for (String s : r.reqDocList) {
-                    if (s1DocidsList.contains(s)) {
-                        ++requestDocsFound;
+                    for (String s : r.reqDocList) {
+                        if (s1DocidsList.contains(s)) {
+                            ++requestDocsFound;
+                        }
                     }
-                }
                 /*
                 System.out.println("Task docs:");
                 System.out.println(t.taskDocList);
@@ -334,48 +339,48 @@ public class Evaluator {
                 System.out.printf("Request docs found: %d\n", requestDocsFound);
                  */
 
-                /* E1 is request level, E2 is task level */
-                double e1Recall = ((double)requestDocsFound / r.reqDocList.size()) * 100;
-                double e2Recall = ((double)taskDocsFound / t.taskDocList.size()) * 100;
-                double e1Precision = ((double)requestDocsFound / s1DocidsList.size()) * 100;
-                double e2Precision = ((double)taskDocsFound / s1DocidsList.size()) * 100;
+                    /* E1 is request level, E2 is task level */
+                    double e1Recall = ((double) requestDocsFound / r.reqDocList.size()) * 100;
+                    double e2Recall = ((double) taskDocsFound / t.taskDocList.size()) * 100;
+                    double e1Precision = ((double) requestDocsFound / s1DocidsList.size()) * 100;
+                    double e2Precision = ((double) taskDocsFound / s1DocidsList.size()) * 100;
 
-                String[] s1Docids = new String[s1DocidsList.size()];
-                s1Docids = s1DocidsList.toArray(s1Docids);
+                    String[] s1Docids = new String[s1DocidsList.size()];
+                    s1Docids = s1DocidsList.toArray(s1Docids);
 
-                //System.out.printf("Top %d hits for E1:\n", r.reqDocList.size());
-                int score = 0;
-                for (int x = 0; x < r.reqDocList.size(); ++x) {
-                    //System.out.println(s1Docids[x]);
-                    if (r.reqDocList.contains(s1Docids[x])) {
-                        score += 1;
+                    //System.out.printf("Top %d hits for E1:\n", r.reqDocList.size());
+                    int score = 0;
+                    for (int x = 0; x < r.reqDocList.size(); ++x) {
+                        //System.out.println(s1Docids[x]);
+                        if (r.reqDocList.contains(s1Docids[x])) {
+                            score += 1;
+                        }
                     }
-                }
-                double e1RPrecision = ((double)score / r.reqDocList.size()) * 100;
+                    double e1RPrecision = ((double) score / r.reqDocList.size()) * 100;
 
-                //System.out.printf("Top %d hits for E2:\n", t.taskDocList.size() );
-                score = 0;
-                for (int x = 0; x < t.taskDocList.size(); ++x) {
-                    //System.out.println(s1Docids[x]);
-                    if (t.taskDocList.contains(s1Docids[x])) {
-                        score += 1;
+                    //System.out.printf("Top %d hits for E2:\n", t.taskDocList.size() );
+                    score = 0;
+                    for (int x = 0; x < t.taskDocList.size(); ++x) {
+                        //System.out.println(s1Docids[x]);
+                        if (t.taskDocList.contains(s1Docids[x])) {
+                            score += 1;
+                        }
                     }
-                }
-                double e2RPrecision = ((double)score / t.taskDocList.size()) * 100;
+                    double e2RPrecision = ((double) score / t.taskDocList.size()) * 100;
 
-                taskE1Precision += e1Precision;
-                taskE2Precision += e2Precision;
-                taskE1Recall += e1Recall;
-                taskE2Recall += e2Recall;
-                taskE1RPrecision += e1RPrecision;
-                taskE2RPrecision += e2RPrecision;
-                
-                totalE1Precision += e1Precision;
-                totalE2Precision += e2Precision;
-                totalE1Recall += e1Recall;
-                totalE2Recall += e2Recall;
-                totalE1RPrecision += e1RPrecision;
-                totalE2RPrecision += e2RPrecision;
+                    taskE1Precision += e1Precision;
+                    taskE2Precision += e2Precision;
+                    taskE1Recall += e1Recall;
+                    taskE2Recall += e2Recall;
+                    taskE1RPrecision += e1RPrecision;
+                    taskE2RPrecision += e2RPrecision;
+
+                    totalE1Precision += e1Precision;
+                    totalE2Precision += e2Precision;
+                    totalE1Recall += e1Recall;
+                    totalE2Recall += e2Recall;
+                    totalE1RPrecision += e1RPrecision;
+                    totalE2RPrecision += e2RPrecision;
  
                 /*
                 System.out.println("Request " + requestID);
@@ -388,125 +393,134 @@ public class Evaluator {
                 System.out.println("    Precision: " + e2Precision);
                 System.out.println("    RPrecision: " + e2RPrecision);
                 */
-            }
-            if (!prevTaskID.equals("EMPTY")) {
-                ++totalTasks;
-                totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
-                totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
-                totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
-                totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
-                totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
-                totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
-            }
-            double microAvgE1Recall = totalE1Recall / numRequests;
-            double microAvgE1Precision = totalE1Precision / numRequests;
-            double microAvgE1RPrecision = totalE1RPrecision / numRequests;
-            double microAvgE2Recall = totalE2Recall / numRequests;
-            double microAvgE2Precision = totalE2Precision / numRequests;
-            double microAvgE2RPrecision = totalE2RPrecision / numRequests;
-            
-            double macroAvgE1Recall = totalTaskE1Recall / totalTasks;
-            double macroAvgE1Precision = totalTaskE1Precision / totalTasks;
-            double macroAvgE1RPrecision = totalTaskE1RPrecision / totalTasks;
-            double macroAvgE2Recall = totalTaskE2Recall / totalTasks;
-            double macroAvgE2Precision = totalTaskE2Precision / totalTasks;
-            double macroAvgE2RPrecision = totalTaskE2RPrecision / totalTasks;
+                }
+                if (!prevTaskID.equals("EMPTY")) {
+                    ++totalTasks;
+                    totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
+                    totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
+                    totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
+                    totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
+                    totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
+                    totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
+                }
+                double microAvgE1Recall = totalE1Recall / numRequests;
+                double microAvgE1Precision = totalE1Precision / numRequests;
+                double microAvgE1RPrecision = totalE1RPrecision / numRequests;
+                double microAvgE2Recall = totalE2Recall / numRequests;
+                double microAvgE2Precision = totalE2Precision / numRequests;
+                double microAvgE2RPrecision = totalE2RPrecision / numRequests;
 
-            csvWriter.append(solutionName);
-            csvWriter.append(",");
-            csvWriter.append("Request");
-            csvWriter.append(",");
-            csvWriter.append(Integer.toString(MAX_DOCIDS));
-            csvWriter.append(",");
-            csvWriter.append("MICRO");
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE1Recall));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE1Precision));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE1RPrecision));
-            csvWriter.append("\n");
+                double macroAvgE1Recall = totalTaskE1Recall / totalTasks;
+                double macroAvgE1Precision = totalTaskE1Precision / totalTasks;
+                double macroAvgE1RPrecision = totalTaskE1RPrecision / totalTasks;
+                double macroAvgE2Recall = totalTaskE2Recall / totalTasks;
+                double macroAvgE2Precision = totalTaskE2Precision / totalTasks;
+                double macroAvgE2RPrecision = totalTaskE2RPrecision / totalTasks;
 
-            csvWriter.append(solutionName);
-            csvWriter.append(",");
-            csvWriter.append("Task");
-            csvWriter.append(",");
-            csvWriter.append(Integer.toString(MAX_DOCIDS));
-            csvWriter.append(",");
-            csvWriter.append("MICRO");
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE2Recall));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE2Precision));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",microAvgE2RPrecision));
-            csvWriter.append("\n");
+                /* Do MACRO only */
+//            csvWriter.append(solutionName);
+//            csvWriter.append(",");
+//            csvWriter.append("Request");
+//            csvWriter.append(",");
+//            csvWriter.append(Integer.toString(resultSetSize));
+//            csvWriter.append(",");
+//            /*
+//            csvWriter.append("MICRO");
+//            csvWriter.append(",");
+//            */
+//            csvWriter.append(String.format("%.2f",microAvgE1Recall));
+//            csvWriter.append(",");
+//            csvWriter.append(String.format("%.2f",microAvgE1Precision));
+//            csvWriter.append(",");
+//            csvWriter.append(String.format("%.2f",microAvgE1RPrecision));
+//            csvWriter.append("\n");
+//
+//            csvWriter.append(solutionName);
+//            csvWriter.append(",");
+//            csvWriter.append("Task");
+//            csvWriter.append(",");
+//            csvWriter.append(Integer.toString(resultSetSize));
+//            csvWriter.append(",");
+//            /*
+//            csvWriter.append("MICRO");
+//            csvWriter.append(",");
+//            */
+//            csvWriter.append(String.format("%.2f",microAvgE2Recall));
+//            csvWriter.append(",");
+//            csvWriter.append(String.format("%.2f",microAvgE2Precision));
+//            csvWriter.append(",");
+//            csvWriter.append(String.format("%.2f",microAvgE2RPrecision));
+//            csvWriter.append("\n");
 
-            csvWriter.append(solutionName);
-            csvWriter.append(",");
-            csvWriter.append("Request");
-            csvWriter.append(",");
-            csvWriter.append(Integer.toString(MAX_DOCIDS));
-            csvWriter.append(",");
+                csvWriter.append(solutionName);
+                csvWriter.append(",");
+                csvWriter.append("Request");
+                csvWriter.append(",");
+                csvWriter.append(Integer.toString(resultSetSize));
+                csvWriter.append(",");
+            /*
             csvWriter.append("MACRO");
             csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE1Recall));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE1Precision));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE1RPrecision));
-            csvWriter.append("\n");
+            */
+                csvWriter.append(String.format("%.2f", macroAvgE1Recall));
+                csvWriter.append(",");
+                csvWriter.append(String.format("%.2f", macroAvgE1Precision));
+                csvWriter.append(",");
+                csvWriter.append(String.format("%.2f", macroAvgE1RPrecision));
+                csvWriter.append("\n");
 
-            csvWriter.append(solutionName);
-            csvWriter.append(",");
-            csvWriter.append("Task");
-            csvWriter.append(",");
-            csvWriter.append(Integer.toString(MAX_DOCIDS));
-            csvWriter.append(",");
+                csvWriter.append(solutionName);
+                csvWriter.append(",");
+                csvWriter.append("Task");
+                csvWriter.append(",");
+                csvWriter.append(Integer.toString(resultSetSize));
+                csvWriter.append(",");
+            /*
             csvWriter.append("MACRO");
             csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE2Recall));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE2Precision));
-            csvWriter.append(",");
-            csvWriter.append(String.format("%.2f",macroAvgE2RPrecision));
-            csvWriter.append("\n");
+            */
+                csvWriter.append(String.format("%.2f", macroAvgE2Recall));
+                csvWriter.append(",");
+                csvWriter.append(String.format("%.2f", macroAvgE2Precision));
+                csvWriter.append(",");
+                csvWriter.append(String.format("%.2f", macroAvgE2RPrecision));
+                csvWriter.append("\n");
 
-            csvWriter.flush();
-            System.out.println("****************************************");
-            System.out.printf("solution: %s\n", solutionName );
-            System.out.printf("atRank: %d\n", MAX_DOCIDS);
-            System.out.printf("relevantDocSetUsed: %s\n", "Request Docs");
-            System.out.printf("averagingType: %s\n", "MICRO");
-            System.out.printf("avgRecall: %.2f\n", microAvgE1Recall);
-            System.out.printf("avgPrecision: %.2f\n", microAvgE1Precision);
-            System.out.printf("avgRPrecision: %.2f\n", microAvgE1RPrecision);
+                csvWriter.flush();
+                System.out.println("****************************************");
+                System.out.printf("solution: %s\n", solutionName);
+                System.out.printf("atRank: %d\n", resultSetSize);
+                System.out.printf("relevantDocSetUsed: %s\n", "Request Docs");
+                System.out.printf("averagingType: %s\n", "MICRO");
+                System.out.printf("avgRecall: %.2f\n", microAvgE1Recall);
+                System.out.printf("avgPrecision: %.2f\n", microAvgE1Precision);
+                System.out.printf("avgRPrecision: %.2f\n", microAvgE1RPrecision);
 
-            System.out.printf("solution: %s\n", solutionName );
-            System.out.printf("atRank: %d\n", MAX_DOCIDS);
-            System.out.printf("relevantDocSetUsed: %s\n", "Task Docs");
-            System.out.printf("averagingType: %s\n", "MICRO");
-            System.out.printf("avgRecall: %.2f\n", microAvgE2Recall);
-            System.out.printf("avgPrecision: %.2f\n", microAvgE2Precision);
-            System.out.printf("avgRPrecision: %.2f\n", microAvgE2RPrecision);
+                System.out.printf("solution: %s\n", solutionName);
+                System.out.printf("atRank: %d\n", resultSetSize);
+                System.out.printf("relevantDocSetUsed: %s\n", "Task Docs");
+                System.out.printf("averagingType: %s\n", "MICRO");
+                System.out.printf("avgRecall: %.2f\n", microAvgE2Recall);
+                System.out.printf("avgPrecision: %.2f\n", microAvgE2Precision);
+                System.out.printf("avgRPrecision: %.2f\n", microAvgE2RPrecision);
 
-            System.out.printf("solution: %s\n", solutionName );
-            System.out.printf("atRank: %d\n", MAX_DOCIDS);
-            System.out.printf("relevantDocSetUsed: %s\n", "Request Docs");
-            System.out.printf("averagingType: %s\n", "MACRO");
-            System.out.printf("avgRecall: %.2f\n", macroAvgE1Recall);
-            System.out.printf("avgPrecision: %.2f\n", macroAvgE1Precision);
-            System.out.printf("avgRPrecision: %.2f\n", macroAvgE1RPrecision);
+                System.out.printf("solution: %s\n", solutionName);
+                System.out.printf("atRank: %d\n", resultSetSize);
+                System.out.printf("relevantDocSetUsed: %s\n", "Request Docs");
+                System.out.printf("averagingType: %s\n", "MACRO");
+                System.out.printf("avgRecall: %.2f\n", macroAvgE1Recall);
+                System.out.printf("avgPrecision: %.2f\n", macroAvgE1Precision);
+                System.out.printf("avgRPrecision: %.2f\n", macroAvgE1RPrecision);
 
-            System.out.printf("solution: %s\n", solutionName );
-            System.out.printf("atRank: %d\n", MAX_DOCIDS);
-            System.out.printf("relevantDocSetUsed: %s\n", "Task Docs");
-            System.out.printf("averagingType: %s\n", "MACRO");
-            System.out.printf("avgRecall: %.2f\n", macroAvgE2Recall);
-            System.out.printf("avgPrecision: %.2f\n", macroAvgE2Precision);
-            System.out.printf("avgRPrecision: %.2f\n", macroAvgE2RPrecision);
+                System.out.printf("solution: %s\n", solutionName);
+                System.out.printf("atRank: %d\n", resultSetSize);
+                System.out.printf("relevantDocSetUsed: %s\n", "Task Docs");
+                System.out.printf("averagingType: %s\n", "MACRO");
+                System.out.printf("avgRecall: %.2f\n", macroAvgE2Recall);
+                System.out.printf("avgPrecision: %.2f\n", macroAvgE2Precision);
+                System.out.printf("avgRPrecision: %.2f\n", macroAvgE2RPrecision);
 
-            //            System.out.println((taskMatchCount + requestMatchCount)
+                //            System.out.println((taskMatchCount + requestMatchCount)
 //                               + " out of " + (totalRequestDocids + totalTaskDocids));
 //            System.out.printf("%.0f%%\n",
 //            ((taskMatchCount + requestMatchCount) * 1.0 /
@@ -514,6 +528,7 @@ public class Evaluator {
 //            System.out.printf("%.0f%%\n",
 //                    ((requestMatchCount) * 1.0 /
 //                            (totalRequestDocids ) * 100));
+            }
         }
         csvWriter.close();
     }
