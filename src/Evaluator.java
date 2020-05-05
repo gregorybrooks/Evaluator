@@ -223,24 +223,36 @@ public class Evaluator {
         fixTaskDocs();  //Make sure task-docs contains all req-docs
         loadSolutionResults();
 
-//        List<String> solutions = new ArrayList<String>(Arrays.asList(
-//                "CLEAR-BASE-TEST",
-//                "CLEAR-2-TEST",
-//                "CLEAR-1-TEST",
-//                "CLEAR-3-TEST",
-//                "CLEAR-4-TEST",
-//                "CLEAR-5-TEST",
-//                "CLEAR-6-TEST",
-//                "BBN-1",
-//                "JHU-1",
-//                "BROWN-1"
-//                ));
-
         List<String> solutions = new ArrayList<String>(Arrays.asList(
-                  "CLEAR-2-TEST"
-        ));
+                "CLEAR-BASE-TEST",
+                "CLEAR-2-TEST",
+                "CLEAR-1-TEST",
+                "CLEAR-3-TEST",
+                "CLEAR-4-TEST",
+                "CLEAR-5-TEST",
+                "CLEAR-6-TEST",
+                "BBN-1",
+                "JHU-1",
+                "BROWN-1"
+                ));
 
         System.out.println("Looking at the top " + MAX_DOCIDS + " hits for each query");
+
+        FileWriter csvWriter = new FileWriter("/home/glbrooks/comparison.csv");
+        csvWriter.append("Solution");
+        csvWriter.append(",");
+        csvWriter.append("Relevant Docs Used");
+        csvWriter.append(",");
+        csvWriter.append("Result Set Size");
+        csvWriter.append(",");
+        csvWriter.append("Averaging Type");
+        csvWriter.append(",");
+        csvWriter.append("Avg Recall (Pct)");
+        csvWriter.append(",");
+        csvWriter.append("Avg Precision (Pct)");
+        csvWriter.append(",");
+        csvWriter.append("Avg R Precision (Pct)");
+        csvWriter.append("\n");
 
         for (String solutionName : solutions) {
             Solution s1 = solutionResults.get(solutionName);
@@ -400,6 +412,68 @@ public class Evaluator {
             double macroAvgE2Precision = totalTaskE2Precision / totalTasks;
             double macroAvgE2RPrecision = totalTaskE2RPrecision / totalTasks;
 
+            csvWriter.append(solutionName);
+            csvWriter.append(",");
+            csvWriter.append("Request");
+            csvWriter.append(",");
+            csvWriter.append(Integer.toString(MAX_DOCIDS));
+            csvWriter.append(",");
+            csvWriter.append("MICRO");
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE1Recall));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE1Precision));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE1RPrecision));
+            csvWriter.append("\n");
+
+            csvWriter.append(solutionName);
+            csvWriter.append(",");
+            csvWriter.append("Task");
+            csvWriter.append(",");
+            csvWriter.append(Integer.toString(MAX_DOCIDS));
+            csvWriter.append(",");
+            csvWriter.append("MICRO");
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE2Recall));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE2Precision));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",microAvgE2RPrecision));
+            csvWriter.append("\n");
+
+            csvWriter.append(solutionName);
+            csvWriter.append(",");
+            csvWriter.append("Request");
+            csvWriter.append(",");
+            csvWriter.append(Integer.toString(MAX_DOCIDS));
+            csvWriter.append(",");
+            csvWriter.append("MACRO");
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE1Recall));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE1Precision));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE1RPrecision));
+            csvWriter.append("\n");
+
+            csvWriter.append(solutionName);
+            csvWriter.append(",");
+            csvWriter.append("Task");
+            csvWriter.append(",");
+            csvWriter.append(Integer.toString(MAX_DOCIDS));
+            csvWriter.append(",");
+            csvWriter.append("MACRO");
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE2Recall));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE2Precision));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f",macroAvgE2RPrecision));
+            csvWriter.append("\n");
+
+            csvWriter.flush();
+            System.out.println("****************************************");
             System.out.printf("solution: %s\n", solutionName );
             System.out.printf("atRank: %d\n", MAX_DOCIDS);
             System.out.printf("relevantDocSetUsed: %s\n", "Request Docs");
@@ -441,6 +515,7 @@ public class Evaluator {
 //                    ((requestMatchCount) * 1.0 /
 //                            (totalRequestDocids ) * 100));
         }
+        csvWriter.close();
     }
 
     /**
