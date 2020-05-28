@@ -21,7 +21,7 @@ public class Request {
      */
     Request(JSONObject request) {
         reqNum = (String) request.get("req-num");
-        reqText = Evaluator.filterCertainCharacters((String) request.get("req-text"));
+        reqText = Task.filterCertainCharacters((String) request.get("req-text"));
         JSONArray reqDocs = (JSONArray) request.get("req-docs");
         JSONArray reqExtr = (JSONArray) request.get("req-extr");
 
@@ -31,7 +31,7 @@ public class Request {
             reqDocList.add((String) d);
         }
         for (Object d : reqExtr) {
-            reqExtrList.add(Evaluator.filterCertainCharacters((String) d));
+            reqExtrList.add(Task.filterCertainCharacters((String) d));
         }
     }
 
@@ -52,5 +52,15 @@ public class Request {
         logger.info("Request Text: " + reqText);
         logger.info("Request Docs: " + reqDocList);
         logger.info("Request Extractions: " + reqExtrList);
+    }
+    /**
+     * Returns an HTML-ready string of this Request's fields.
+     */
+    public String getRequestData() {
+        String s = "<b>Request Number:</b> " + reqNum
+                + "<br><b>Request Text: </b>" + reqText
+//        + "<br><b>Request Docs: </b>" + reqDocList
+                + "<br><b>Request Extractions: </b>" + reqExtrList;
+        return s;
     }
 }
