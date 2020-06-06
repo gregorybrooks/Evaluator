@@ -166,7 +166,7 @@ public class Evaluator {
                         }
                     }
                     for (String s : runDocids) {
-                        if (tasks.getRelevanceJudgement(requestID, s) == null) {
+                        if (tasks.getRelevanceJudgment(requestID, s) == null) {
                             ++unjudgedDocsFound;
                         }
                     }
