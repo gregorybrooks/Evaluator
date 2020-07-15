@@ -5,6 +5,8 @@ import org.json.simple.parser.ParseException;
 import java.io.*;
 import java.util.*;
 
+import static edu.umass.ciir.Pathnames.evaluationFileLocation;
+
 /**
  * Evaluates the query formulations and outputs a CSV file of evaluation results.
  * Evaluation Type 1 (E1) uses the docs judged to be REQUEST RELEVANT only as the known relevant
@@ -30,9 +32,11 @@ public class Evaluator {
      * @throws InterruptedException
      * @throws ParseException
      */
-    private void process() throws IOException, InterruptedException, ParseException {
+    private void process(String[] args) throws IOException, InterruptedException, ParseException {
         Pathnames.getPathnames();
-        AnalyticTasks tasks = new AnalyticTasks();
+        String taskFileName = args[0];
+
+        AnalyticTasks tasks = new AnalyticTasks(taskFileName);
         tasks.fixTaskDocs();  //Make sure task-docs contains all req-docs for that task
 
         /* This is the list of query formulations to process.
@@ -65,7 +69,7 @@ public class Evaluator {
         ));
 
         /* Create and open the output CSV file */
-        FileWriter csvWriter = new FileWriter("c:\\Users\\grego\\comparison.csv");
+        FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison.csv");
         /* Write the header line */
         csvWriter.append("Solution");
         csvWriter.append(",");
@@ -84,7 +88,7 @@ public class Evaluator {
 
         for (Integer rsize : resultSetSizes) {
             for (String queryFormulationName : queryFormulations) {
-                QueryFormulation queryFormulation = new QueryFormulation(queryFormulationName);
+                QuerySet queryFormulation = new QuerySet(taskFileName + "." + queryFormulationName);
 
                 System.out.println("Evaluating solution " + queryFormulation.getName() + " for top "
                     + rsize + " results");
@@ -152,6 +156,9 @@ public class Evaluator {
 
                     List<String> reqDocList = tasks.getRequestRelevantDocids(requestID);
                     List<String> taskDocList = tasks.getTaskAndRequestRelevantDocids(requestID);
+                    if (reqDocList.size() == 0 || taskDocList.size() == 0) {
+                        continue;
+                    }
                     int taskDocsFound = 0;
                     int requestDocsFound = 0;
                     int unjudgedDocsFound = 0;
@@ -277,6 +284,6 @@ public class Evaluator {
      */
     public static void main(String[] args) throws IOException, InterruptedException, ParseException {
         Evaluator evaluator = new Evaluator();
-        evaluator.process();
+        evaluator.process(args);
     }
 }
