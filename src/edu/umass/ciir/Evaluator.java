@@ -46,15 +46,15 @@ public class Evaluator {
         to the same directory and used our naming convention, so we can evaluate them, too.
          */
         List<String> queryFormulations = new ArrayList<String>(Arrays.asList(
-                "CLEAR-BASE-TEST",
-                "CLEAR-2-TEST",
-                "CLEAR-1-TEST",
-                "CLEAR-3-TEST",
-                "CLEAR-4-TEST",
-                "CLEAR-5-TEST",
-                "CLEAR-6-TEST",
-                "CLEAR-7-TEST",
-                "CLEAR-8-TEST",
+//                "CLEAR-BASE-TEST",
+                "CLEAR-2",
+                "CLEAR-1",
+                "CLEAR-3",
+                "CLEAR-4",
+                "CLEAR-5",
+                "CLEAR-6",
+                "CLEAR-7",
+                "CLEAR-8",
                 "BBN-1",
                 "JHU-1",
                 "BROWN-1"
@@ -69,7 +69,7 @@ public class Evaluator {
         ));
 
         /* Create and open the output CSV file */
-        FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison.csv");
+        FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison_all_nosampledocs.csv");
         /* Write the header line */
         csvWriter.append("Solution");
         csvWriter.append(",");
@@ -128,9 +128,6 @@ public class Evaluator {
                     List<String> runDocids = queryFormulation.getDocids(requestID, rsize);
                     taskID = requestID.substring(0, 5);
 
-                    if (!taskID.equals("DR-T1"))  //TEMP - only Task 1 has been judged
-                        continue;  // TEMP
-
                     if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
                         ++totalTasks;
                         totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
@@ -152,13 +149,13 @@ public class Evaluator {
                         totalRequestsInTask = 0;
                     }
                     prevTaskID = taskID;
-                    ++totalRequestsInTask;
 
                     List<String> reqDocList = tasks.getRequestRelevantDocids(requestID);
                     List<String> taskDocList = tasks.getTaskAndRequestRelevantDocids(requestID);
                     if (reqDocList.size() == 0 || taskDocList.size() == 0) {
                         continue;
                     }
+                    ++totalRequestsInTask;
                     int taskDocsFound = 0;
                     int requestDocsFound = 0;
                     int unjudgedDocsFound = 0;
