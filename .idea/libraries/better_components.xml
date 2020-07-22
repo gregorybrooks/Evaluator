@@ -4,8 +4,6 @@
       <root url="jar://$PROJECT_DIR$/../BETTERComponents/out/artifacts/better_components_jar/better-components.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES>
-      <root url="file://$PROJECT_DIR$/../BETTERComponents/src" />
-    </SOURCES>
+    <SOURCES />
   </library>
 </component>

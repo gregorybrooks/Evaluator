@@ -1,9 +1,8 @@
 package edu.umass.ciir;
 
-import org.json.simple.parser.ParseException;
-
 import java.io.*;
 import java.util.*;
+import org.json.simple.parser.ParseException;
 
 import static edu.umass.ciir.Pathnames.evaluationFileLocation;
 
@@ -18,25 +17,72 @@ import static edu.umass.ciir.Pathnames.evaluationFileLocation;
  * divides the totals by the number of tasks.
  */
 public class Evaluator {
+    AnalyticTasks tasks = null;
+
+    /**
+     * Calculates the normalized discounted cumulative gain
+     * for this request and this ranked set of docs.
+     * @param requestID The request, with its relevance judgments available.
+     * @param runDocids The ranked hits.
+     * @return The calculated nDCG.
+     */
+    private double calculatenDCG( String requestID, List<String> runDocids) {
+        List<RelevanceJudgment> judgments = tasks.getRelevanceJudgments(requestID);
+        if (runDocids.size() < judgments.size()) {
+             return 0.0;  // can't calc it
+        }
+        int cutoff = judgments.size();
+        /* Calculate the ideal discounted cumulative gain for this query */
+        judgments.sort(Comparator.comparingInt(RelevanceJudgment::getRelevanceJudgmentValue)
+                .reversed());
+        double iDCG = 0.0;
+        int index = 1;
+        for (RelevanceJudgment j : judgments) {
+            if (index == 1) {
+                iDCG += j.getRelevanceJudgmentValue();
+            }
+            else {
+                iDCG += (j.getRelevanceJudgmentValue() / ((Math.log(index + 1) / Math.log(2))));
+
+            }
+            ++index;
+        }
+        /* Calculate discounted cumulative gain of the ranked hits */
+        double DCG = 0.0;
+        index = 1;
+        for (String docid : runDocids) {
+            if (index == 1) {
+                DCG += tasks.getRelevanceJudgmentValue(requestID, docid);
+            }
+            else {
+                DCG += (tasks.getRelevanceJudgmentValue(requestID, docid)
+                        / ((Math.log(index + 1) / Math.log(2))));
+
+            }
+            ++index;
+            if (index > cutoff) {
+                break;
+            }
+        }
+        /* Calculate the normalized discounted cumulative gain */
+        double nCDG = DCG / iDCG;
+        return nCDG;
+    }
 
     /**
      * Evaluates the query formulations and outputs a CSV file of evaluation results.
-     * Evaluation Type 1 (E1) uses the docs judged to be REQUEST RELEVANT only as the known relevant
-     * docs for a request. Evaluation Type 2 (E2) uses the docs judged to be TASK RELEVANT or
-     * REQUEST RELEVANT as the known relevant docs for a request.
+     * This version only calculates nDCG.
      *
-     * For averaging the evaluation results, we use the MACRO approach:
-     * MACRO averages the results at the task level, accumulates those results and
-     * divides the totals by the number of tasks.
+     * For averaging the evaluation results, we use the MICRO approach.
      * @throws IOException
      * @throws InterruptedException
      * @throws ParseException
      */
-    private void process(String[] args) throws IOException, InterruptedException, ParseException {
+    private void process(String[] args) throws IOException, ParseException {
         Pathnames.getPathnames();
         String taskFileName = args[0];
 
-        AnalyticTasks tasks = new AnalyticTasks(taskFileName);
+        tasks = new AnalyticTasks(taskFileName);
         tasks.fixTaskDocs();  //Make sure task-docs contains all req-docs for that task
 
         /* This is the list of query formulations to process.
@@ -65,25 +111,17 @@ public class Evaluator {
         in this list.
          */
         List<Integer> resultSetSizes = new ArrayList<Integer>(Arrays.asList(
-                10, 20, 50, 100, 250, 500, 1000
+                1000
         ));
 
         /* Create and open the output CSV file */
-        FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison_all_nosampledocs.csv");
+        FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison_all_nosampledocs_ndcg.csv");
         /* Write the header line */
         csvWriter.append("Solution");
         csvWriter.append(",");
-        csvWriter.append("Judgment Set Used");
+        csvWriter.append("Normalized DCG - MICRO");
         csvWriter.append(",");
-        csvWriter.append("Result Set Size");
-        csvWriter.append(",");
-        csvWriter.append("Recall (Pct)");
-        csvWriter.append(",");
-        csvWriter.append("Precision (Pct)");
-        csvWriter.append(",");
-        csvWriter.append("R Precision (Pct)");
-        csvWriter.append(",");
-        csvWriter.append("Unjudged (Pct)");
+        csvWriter.append("Normalized DCG - MACRO");
         csvWriter.append("\n");
 
         for (Integer rsize : resultSetSizes) {
@@ -93,34 +131,22 @@ public class Evaluator {
                 System.out.println("Evaluating solution " + queryFormulation.getName() + " for top "
                     + rsize + " results");
 
-                // Assume every formulation includes all requests defined in the analytic task file.
                 List<String> requestIDs = tasks.getRequestIDs();
                 ListIterator<String> requestIDIterator = requestIDs.listIterator();
 
                 /* macro averaging approach accumulators */
-                double totalTaskE1Recall = 0.0;
-                double totalTaskE1Precision = 0.0;
-                double totalTaskE1RPrecision = 0.0;
-                double totalTaskE1Unjudged = 0.0;
-                double totalTaskE2Recall = 0.0;
-                double totalTaskE2Precision = 0.0;
-                double totalTaskE2RPrecision = 0.0;
-                double totalTaskE2Unjudged = 0.0;
+                double totalTasknCDG = 0.0;
 
+                int totalRequests = 0;
                 int totalTasks = 0;  // this will be calculated as we go through the requests
                 String prevTaskID = "EMPTY";  // used to detect Task changes
                 String taskID = "";  // used to detect Task changes
                 int totalRequestsInTask = 0;  // this will be calculated as we go through the requests
 
                 /* macro averaging approach task-level accumulators */
-                double taskE1Recall = 0.0;
-                double taskE1Precision = 0.0;
-                double taskE1RPrecision = 0.0;
-                double taskE1Unjudged = 0.0;
-                double taskE2Recall = 0.0;
-                double taskE2Precision = 0.0;
-                double taskE2RPrecision = 0.0;
-                double taskE2Unjudged = 0.0;
+                double tasknCDG = 0.0;
+
+                double totalnDCG = 0.0;
 
                 /* Assumption: all requests for a task are contiguous as we iterate them */
                 while (requestIDIterator.hasNext()) {
@@ -130,142 +156,42 @@ public class Evaluator {
 
                     if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
                         ++totalTasks;
-                        totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
-                        totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
-                        totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
-                        totalTaskE1Unjudged += (taskE1Unjudged / totalRequestsInTask);
-                        totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
-                        totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
-                        totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
-                        totalTaskE2Unjudged += (taskE2Unjudged / totalRequestsInTask);
-                        taskE1Recall = 0.0;
-                        taskE1Precision = 0.0;
-                        taskE1RPrecision = 0.0;
-                        taskE1Unjudged = 0.0;
-                        taskE2Recall = 0.0;
-                        taskE2Precision = 0.0;
-                        taskE2RPrecision = 0.0;
-                        taskE2Unjudged = 0.0;
+                        totalTasknCDG += (tasknCDG / totalRequestsInTask);
+                        tasknCDG = 0.0;
                         totalRequestsInTask = 0;
                     }
                     prevTaskID = taskID;
 
                     List<String> reqDocList = tasks.getRequestRelevantDocids(requestID);
                     List<String> taskDocList = tasks.getTaskAndRequestRelevantDocids(requestID);
+
+                    /* If we have no relevance judgments for this query, skip evaluating it */
                     if (reqDocList.size() == 0 || taskDocList.size() == 0) {
                         continue;
                     }
+                    ++totalRequests;
                     ++totalRequestsInTask;
-                    int taskDocsFound = 0;
-                    int requestDocsFound = 0;
-                    int unjudgedDocsFound = 0;
-                    for (String s : taskDocList) {
-                        if (runDocids.contains(s)) {
-                            ++taskDocsFound;
-                        }
-                    }
-                    for (String s : reqDocList) {
-                        if (runDocids.contains(s)) {
-                            ++requestDocsFound;
-                        }
-                    }
-                    for (String s : runDocids) {
-                        if (tasks.getRelevanceJudgment(requestID, s) == null) {
-                            ++unjudgedDocsFound;
-                        }
-                    }
 
-
-                    /* E1 is request level, E2 is task level */
-                    double e1Recall = ((double) requestDocsFound / reqDocList.size()) * 100;
-                    double e2Recall = ((double) taskDocsFound / taskDocList.size()) * 100;
-                    double e1Precision = ((double) requestDocsFound / runDocids.size()) * 100;
-                    double e2Precision = ((double) taskDocsFound / runDocids.size()) * 100;
-                    double e1Unjudged = ((double) unjudgedDocsFound / runDocids.size()) * 100;
-                    double e2Unjudged = ((double) unjudgedDocsFound / runDocids.size()) * 100;
-
-                    String[] runDocidsAsArray = new String[runDocids.size()];
-                    runDocidsAsArray = runDocids.toArray(runDocidsAsArray);
-
-                    /* How many request docs are in the top N hits? (E1) */
-                    int docMatches = 0;
-                    for (int x = 0; x < reqDocList.size() && x < runDocids.size(); ++x) {
-                        if (reqDocList.contains(runDocidsAsArray[x])) {
-                            docMatches += 1;
-                        }
-                    }
-                    double e1RPrecision = ((double) docMatches / reqDocList.size()) * 100;
-
-                    /* How many task docs are in the top N hits? (E2) */
-                    docMatches = 0;
-                    for (int x = 0; x < taskDocList.size() && x < runDocids.size(); ++x) {
-                        if (taskDocList.contains(runDocidsAsArray[x])) {
-                            docMatches += 1;
-                        }
-                    }
-                    double e2RPrecision = ((double) docMatches / taskDocList.size()) * 100;
-
+                    double nDCG = calculatenDCG(requestID, runDocids);
+                    totalnDCG += nDCG;
                     /* Accumulators for macro averaging approach */
-                    taskE1Precision += e1Precision;
-                    taskE2Precision += e2Precision;
-                    taskE1Recall += e1Recall;
-                    taskE2Recall += e2Recall;
-                    taskE1RPrecision += e1RPrecision;
-                    taskE2RPrecision += e2RPrecision;
-                    taskE1Unjudged += e1Unjudged;
-                    taskE2Unjudged += e2Unjudged;
+                    tasknCDG += nDCG;
 
                 }
                 /* Flush out that last Task */
                 if (!prevTaskID.equals("EMPTY")) {
                     ++totalTasks;
-                    totalTaskE1Recall += (taskE1Recall / totalRequestsInTask);
-                    totalTaskE1Precision += (taskE1Precision / totalRequestsInTask);
-                    totalTaskE1RPrecision += (taskE1RPrecision / totalRequestsInTask);
-                    totalTaskE1Unjudged += (taskE1Unjudged / totalRequestsInTask);
-                    totalTaskE2Recall += (taskE2Recall / totalRequestsInTask);
-                    totalTaskE2Precision += (taskE2Precision / totalRequestsInTask);
-                    totalTaskE2RPrecision += (taskE2RPrecision / totalRequestsInTask);
-                    totalTaskE2Unjudged += (taskE2Unjudged / totalRequestsInTask);
+                    totalTasknCDG += (tasknCDG / totalRequestsInTask);
                 }
 
-                double macroAvgE1Recall = totalTaskE1Recall / totalTasks;
-                double macroAvgE1Precision = totalTaskE1Precision / totalTasks;
-                double macroAvgE1RPrecision = totalTaskE1RPrecision / totalTasks;
-                double macroAvgE1Unjudged = totalTaskE1Unjudged / totalTasks;
-                double macroAvgE2Recall = totalTaskE2Recall / totalTasks;
-                double macroAvgE2Precision = totalTaskE2Precision / totalTasks;
-                double macroAvgE2RPrecision = totalTaskE2RPrecision / totalTasks;
-                double macroAvgE2Unjudged = totalTaskE2Unjudged / totalTasks;
+                double macroAvgnDCG = totalTasknCDG / totalTasks;
+                double microAvgnDCG = totalnDCG / totalRequests;
 
                 csvWriter.append(queryFormulationName);
                 csvWriter.append(",");
-                csvWriter.append("REQUEST RELEVANT");
+                csvWriter.append(String.format("%.2f", microAvgnDCG));
                 csvWriter.append(",");
-                csvWriter.append(Integer.toString(rsize));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE1Recall));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE1Precision));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE1RPrecision));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE1Unjudged));
-                csvWriter.append("\n");
-
-                csvWriter.append(queryFormulationName);
-                csvWriter.append(",");
-                csvWriter.append("TASK OR REQUEST RELEVANT");
-                csvWriter.append(",");
-                csvWriter.append(Integer.toString(rsize));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE2Recall));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE2Precision));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE2RPrecision));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgE2Unjudged));
+                csvWriter.append(String.format("%.2f", macroAvgnDCG));
                 csvWriter.append("\n");
 
                 csvWriter.flush();
@@ -279,7 +205,7 @@ public class Evaluator {
      * Public entry point for the program.
      * @param args No arguments are expected.
      */
-    public static void main(String[] args) throws IOException, InterruptedException, ParseException {
+    public static void main(String[] args) throws IOException, ParseException {
         Evaluator evaluator = new Evaluator();
         evaluator.process(args);
     }
