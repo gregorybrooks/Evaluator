@@ -82,15 +82,9 @@ public class Evaluator {
         Pathnames.getPathnames();
         String taskFileName = args[0];
 
-        tasks = new AnalyticTasks(taskFileName);
-        tasks.fixTaskDocs();  //Make sure task-docs contains all req-docs for that task
+        tasks = new AnalyticTasks(taskFileName);  // Evaluation is in the context of an Analytic Tasks file
 
-        /* This is the list of query formulations to process.
-        These should be the query formulations that did NOT reject the task-docs
-        and request-docs. These are the "...-TEST" versions for us, and for the other
-        player's files which apparently did not reject the hint docs anyway I copied them
-        to the same directory and used our naming convention, so we can evaluate them, too.
-         */
+        /* This is the list of query formulations to evaluate.         */
         List<String> queryFormulations = new ArrayList<String>(Arrays.asList(
 //                "CLEAR-BASE-TEST",
                 "CLEAR-2",
@@ -105,14 +99,6 @@ public class Evaluator {
                 "JHU-1",
                 "BROWN-1"
                 ));
-        /*
-        This is the list of result-set sizes we want to evaluate, for each solution.
-        We calculate recall, precision and R precision for the top N hits, where N is each of the sizes
-        in this list.
-         */
-        List<Integer> resultSetSizes = new ArrayList<Integer>(Arrays.asList(
-                1000
-        ));
 
         /* Create and open the output CSV file */
         FileWriter csvWriter = new FileWriter(evaluationFileLocation + "/comparison_all_nosampledocs_ndcg.csv");
@@ -124,81 +110,75 @@ public class Evaluator {
         csvWriter.append("Normalized DCG - MACRO");
         csvWriter.append("\n");
 
-        for (Integer rsize : resultSetSizes) {
-            for (String queryFormulationName : queryFormulations) {
-                QuerySet queryFormulation = new QuerySet(taskFileName + "." + queryFormulationName);
+        for (String queryFormulationName : queryFormulations) {
+            QueryFormulation queryFormulation = new QueryFormulation(tasks, queryFormulationName);
 
-                System.out.println("Evaluating solution " + queryFormulation.getName() + " for top "
-                    + rsize + " results");
+            System.out.println("Evaluating solution " + queryFormulation.getName());
 
-                List<String> requestIDs = tasks.getRequestIDs();
-                ListIterator<String> requestIDIterator = requestIDs.listIterator();
+            List<String> requestIDs = tasks.getRequestIDs();
+            ListIterator<String> requestIDIterator = requestIDs.listIterator();
 
-                /* macro averaging approach accumulators */
-                double totalTasknCDG = 0.0;
+            /* macro averaging approach accumulators */
+            double totalTasknCDG = 0.0;
 
-                int totalRequests = 0;
-                int totalTasks = 0;  // this will be calculated as we go through the requests
-                String prevTaskID = "EMPTY";  // used to detect Task changes
-                String taskID = "";  // used to detect Task changes
-                int totalRequestsInTask = 0;  // this will be calculated as we go through the requests
+            int totalRequests = 0;
+            int totalTasks = 0;  // this will be calculated as we go through the requests
+            String prevTaskID = "EMPTY";  // used to detect Task changes
+            String taskID = "";  // used to detect Task changes
+            int totalRequestsInTask = 0;  // this will be calculated as we go through the requests
 
-                /* macro averaging approach task-level accumulators */
-                double tasknCDG = 0.0;
+            /* macro averaging approach task-level accumulators */
+            double tasknCDG = 0.0;
 
-                double totalnDCG = 0.0;
+            double totalnDCG = 0.0;
 
-                /* Assumption: all requests for a task are contiguous as we iterate them */
-                while (requestIDIterator.hasNext()) {
-                    String requestID = requestIDIterator.next();
-                    List<String> runDocids = queryFormulation.getDocids(requestID, rsize);
-                    taskID = requestID.substring(0, 5);
+            /* Assumption: all requests for a task are contiguous as we iterate them */
+            while (requestIDIterator.hasNext()) {
+                String requestID = requestIDIterator.next();
+                List<String> runDocids = queryFormulation.getDocids(requestID, 1000);
+                taskID = requestID.substring(0, 5);
 
-                    if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
-                        ++totalTasks;
-                        totalTasknCDG += (tasknCDG / totalRequestsInTask);
-                        tasknCDG = 0.0;
-                        totalRequestsInTask = 0;
-                    }
-                    prevTaskID = taskID;
-
-                    List<String> reqDocList = tasks.getRequestRelevantDocids(requestID);
-                    List<String> taskDocList = tasks.getTaskAndRequestRelevantDocids(requestID);
-
-                    /* If we have no relevance judgments for this query, skip evaluating it */
-                    if (reqDocList.size() == 0 || taskDocList.size() == 0) {
-                        continue;
-                    }
-                    ++totalRequests;
-                    ++totalRequestsInTask;
-
-                    double nDCG = calculatenDCG(requestID, runDocids);
-                    totalnDCG += nDCG;
-                    /* Accumulators for macro averaging approach */
-                    tasknCDG += nDCG;
-
-                }
-                /* Flush out that last Task */
-                if (!prevTaskID.equals("EMPTY")) {
+                if (!taskID.equals(prevTaskID) && !prevTaskID.equals("EMPTY")) {
                     ++totalTasks;
                     totalTasknCDG += (tasknCDG / totalRequestsInTask);
+                    tasknCDG = 0.0;
+                    totalRequestsInTask = 0;
                 }
+                prevTaskID = taskID;
 
-                double macroAvgnDCG = totalTasknCDG / totalTasks;
-                double microAvgnDCG = totalnDCG / totalRequests;
+                /* If we have no relevance judgments for this query, skip evaluating it */
+                if (!tasks.hasRelevanceJudgments(requestID)) {
+                    continue;
+                }
+                ++totalRequests;
+                ++totalRequestsInTask;
 
-                csvWriter.append(queryFormulationName);
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", microAvgnDCG));
-                csvWriter.append(",");
-                csvWriter.append(String.format("%.2f", macroAvgnDCG));
-                csvWriter.append("\n");
-
-                csvWriter.flush();
+                double nDCG = calculatenDCG(requestID, runDocids);
+                totalnDCG += nDCG;
+                /* Accumulators for macro averaging approach */
+                tasknCDG += nDCG;
 
             }
+            /* Flush out that last Task */
+            if (!prevTaskID.equals("EMPTY")) {
+                ++totalTasks;
+                totalTasknCDG += (tasknCDG / totalRequestsInTask);
+            }
+
+            double macroAvgnDCG = totalTasknCDG / totalTasks;
+            double microAvgnDCG = totalnDCG / totalRequests;
+
+            csvWriter.append(queryFormulationName);
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f", microAvgnDCG));
+            csvWriter.append(",");
+            csvWriter.append(String.format("%.2f", macroAvgnDCG));
+            csvWriter.append("\n");
+
+            csvWriter.flush();
+
         }
-        csvWriter.close();
+     csvWriter.close();
     }
 
     /**
