@@ -1,4 +1,0 @@
-Apr 22, 2021 11:25:19 PM edu.umass.ciir.Evaluator readTaskFile
-INFO: Reading analytic tasks info file /mnt/scratch/BETTER/BETTER_TEST_ENVIRONMENTS/BETTER_DRY_RUN/scratch/clear_ir/eventextractorfiles/AUTO.analytic_tasks.json
-Apr 22, 2021 11:25:19 PM edu.umass.ciir.Evaluator readRunFile
-INFO: Opening run file /mnt/scratch/BETTER/BETTER_TEST_ENVIRONMENTS/BETTER_SUBMISSION_SYSTEM/runfiles/dry-run-topics.auto.json.shahrzad-task_and_req_doc_entity_ann_0.4.out

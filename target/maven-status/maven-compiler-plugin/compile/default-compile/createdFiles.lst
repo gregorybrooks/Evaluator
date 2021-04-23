@@ -1,0 +1,11 @@
+edu/umass/ciir/Evaluator$RequestRun.class
+edu/umass/ciir/Evaluator$RelevanceJudgmentKey.class
+edu/umass/ciir/RelevanceJudgment$SortByScoreDesc.class
+edu/umass/ciir/Request.class
+edu/umass/ciir/Task.class
+edu/umass/ciir/TasksRunnerException.class
+edu/umass/ciir/Evaluator.class
+edu/umass/ciir/RelevanceJudgment.class
+edu/umass/ciir/Evaluator$BetterEvaluator.class
+edu/umass/ciir/RelevanceJudgment$RelevanceJudgmentType.class
+edu/umass/ciir/Evaluator$Hit.class
