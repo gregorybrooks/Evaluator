@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="better-components">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/../BETTERComponents/out/artifacts/better_components_jar/better-components.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
